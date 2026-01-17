@@ -20,6 +20,7 @@ Tools:
 
 import json
 import os
+import random
 import sys
 import threading
 import time as _time
@@ -313,9 +314,11 @@ def _feature_claim_next_internal(attempt: int = 0) -> str:
             if result.rowcount == 0:
                 # Another process claimed it first - retry with backoff
                 session.close()
-                # Exponential backoff: 0.1s, 0.2s, 0.4s, ... up to 1.0s
+                # Exponential backoff with jitter: base 0.1s, 0.2s, 0.4s, ... up to 1.0s
+                # Jitter of up to 30% prevents synchronized retries under high contention
                 backoff = min(0.1 * (2 ** attempt), 1.0)
-                _time.sleep(backoff)
+                jitter = random.uniform(0, backoff * 0.3)
+                _time.sleep(backoff + jitter)
                 return _feature_claim_next_internal(attempt + 1)
 
             # Fetch the claimed feature

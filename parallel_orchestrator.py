@@ -19,6 +19,8 @@ import time
 from pathlib import Path
 from typing import Callable, Awaitable
 
+import psutil
+
 from api.database import Feature, create_database
 from api.dependency_resolver import are_dependencies_satisfied, compute_scheduling_scores
 
@@ -30,6 +32,59 @@ MAX_PARALLEL_AGENTS = 5
 DEFAULT_CONCURRENCY = 3
 POLL_INTERVAL = 5  # seconds between checking for ready features
 MAX_FEATURE_RETRIES = 3  # Maximum times to retry a failed feature
+
+
+def _kill_process_tree(proc: subprocess.Popen, timeout: float = 5.0) -> None:
+    """Kill a process and all its child processes.
+
+    On Windows, subprocess.terminate() only kills the immediate process, leaving
+    orphaned child processes (e.g., spawned browser instances). This function
+    uses psutil to kill the entire process tree.
+
+    Args:
+        proc: The subprocess.Popen object to kill
+        timeout: Seconds to wait for graceful termination before force-killing
+    """
+    try:
+        parent = psutil.Process(proc.pid)
+        # Get all children recursively before terminating
+        children = parent.children(recursive=True)
+
+        # Terminate children first (graceful)
+        for child in children:
+            try:
+                child.terminate()
+            except psutil.NoSuchProcess:
+                pass
+
+        # Wait for children to terminate
+        _, still_alive = psutil.wait_procs(children, timeout=timeout)
+
+        # Force kill any remaining children
+        for child in still_alive:
+            try:
+                child.kill()
+            except psutil.NoSuchProcess:
+                pass
+
+        # Now terminate the parent
+        proc.terminate()
+        try:
+            proc.wait(timeout=timeout)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            proc.wait()
+
+    except psutil.NoSuchProcess:
+        # Process already dead, just ensure cleanup
+        try:
+            proc.terminate()
+            proc.wait(timeout=1)
+        except (subprocess.TimeoutExpired, OSError):
+            try:
+                proc.kill()
+            except OSError:
+                pass
 
 
 class ParallelOrchestrator:
@@ -302,7 +357,7 @@ class ParallelOrchestrator:
         print(f"Feature #{feature_id} {status}", flush=True)
 
     def stop_feature(self, feature_id: int) -> tuple[bool, str]:
-        """Stop a running feature agent."""
+        """Stop a running feature agent and all its child processes."""
         with self._lock:
             if feature_id not in self.running_agents:
                 return False, "Feature not running"
@@ -313,11 +368,8 @@ class ParallelOrchestrator:
         if abort:
             abort.set()
         if proc:
-            proc.terminate()
-            try:
-                proc.wait(timeout=5)
-            except subprocess.TimeoutExpired:
-                proc.kill()
+            # Kill entire process tree to avoid orphaned children (e.g., browser instances)
+            _kill_process_tree(proc, timeout=5.0)
 
         return True, f"Stopped feature {feature_id}"
 

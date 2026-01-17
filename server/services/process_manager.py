@@ -148,16 +148,36 @@ class AgentProcessManager:
         return self.process.pid if self.process else None
 
     def _check_lock(self) -> bool:
-        """Check if another agent is already running for this project."""
+        """Check if another agent is already running for this project.
+
+        Uses PID + process creation time to handle PID reuse on Windows.
+        """
         if not self.lock_file.exists():
             return True
 
         try:
-            pid = int(self.lock_file.read_text().strip())
+            lock_content = self.lock_file.read_text().strip()
+            # Support both legacy format (just PID) and new format (PID:CREATE_TIME)
+            if ":" in lock_content:
+                pid_str, create_time_str = lock_content.split(":", 1)
+                pid = int(pid_str)
+                stored_create_time = float(create_time_str)
+            else:
+                # Legacy format - just PID
+                pid = int(lock_content)
+                stored_create_time = None
+
             if psutil.pid_exists(pid):
                 # Check if it's actually our agent process
                 try:
                     proc = psutil.Process(pid)
+                    # Verify it's the same process using creation time (handles PID reuse)
+                    if stored_create_time is not None:
+                        # Allow 1 second tolerance for creation time comparison
+                        if abs(proc.create_time() - stored_create_time) > 1.0:
+                            # Different process reused the PID - stale lock
+                            self.lock_file.unlink(missing_ok=True)
+                            return True
                     cmdline = " ".join(proc.cmdline())
                     if "autonomous_agent_demo.py" in cmdline:
                         return False  # Another agent is running
@@ -170,11 +190,34 @@ class AgentProcessManager:
             self.lock_file.unlink(missing_ok=True)
             return True
 
-    def _create_lock(self) -> None:
-        """Create lock file with current process PID."""
+    def _create_lock(self) -> bool:
+        """Atomically create lock file with current process PID and creation time.
+
+        Returns:
+            True if lock was created successfully, False if lock already exists.
+        """
         self.lock_file.parent.mkdir(parents=True, exist_ok=True)
-        if self.process:
-            self.lock_file.write_text(str(self.process.pid))
+        if not self.process:
+            return False
+
+        try:
+            # Get process creation time for PID reuse detection
+            create_time = psutil.Process(self.process.pid).create_time()
+            lock_content = f"{self.process.pid}:{create_time}"
+
+            # Atomic lock creation using O_CREAT | O_EXCL
+            # This prevents TOCTOU race conditions
+            import os
+            fd = os.open(str(self.lock_file), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+            os.write(fd, lock_content.encode())
+            os.close(fd)
+            return True
+        except FileExistsError:
+            # Another process beat us to it
+            return False
+        except (psutil.NoSuchProcess, OSError) as e:
+            logger.warning(f"Failed to create lock file: {e}")
+            return False
 
     def _remove_lock(self) -> None:
         """Remove lock file."""
@@ -305,7 +348,17 @@ class AgentProcessManager:
                 cwd=str(self.project_dir),
             )
 
-            self._create_lock()
+            # Atomic lock creation - if it fails, another process beat us
+            if not self._create_lock():
+                # Kill the process we just started since we couldn't get the lock
+                self.process.terminate()
+                try:
+                    self.process.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    self.process.kill()
+                self.process = None
+                return False, "Another agent instance is already running for this project"
+
             self.started_at = datetime.now()
             self.status = "running"
 
@@ -511,13 +564,29 @@ def cleanup_orphaned_locks() -> int:
                 continue
 
             try:
-                pid_str = lock_file.read_text().strip()
-                pid = int(pid_str)
+                lock_content = lock_file.read_text().strip()
+                # Support both legacy format (just PID) and new format (PID:CREATE_TIME)
+                if ":" in lock_content:
+                    pid_str, create_time_str = lock_content.split(":", 1)
+                    pid = int(pid_str)
+                    stored_create_time = float(create_time_str)
+                else:
+                    # Legacy format - just PID
+                    pid = int(lock_content)
+                    stored_create_time = None
 
                 # Check if process is still running
                 if psutil.pid_exists(pid):
                     try:
                         proc = psutil.Process(pid)
+                        # Verify it's the same process using creation time (handles PID reuse)
+                        if stored_create_time is not None:
+                            if abs(proc.create_time() - stored_create_time) > 1.0:
+                                # Different process reused the PID - stale lock
+                                lock_file.unlink(missing_ok=True)
+                                cleaned += 1
+                                logger.info("Removed orphaned lock file for project '%s' (PID reused)", name)
+                                continue
                         cmdline = " ".join(proc.cmdline())
                         if "autonomous_agent_demo.py" in cmdline:
                             # Process is still running, don't remove

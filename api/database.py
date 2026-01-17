@@ -5,6 +5,7 @@ Database Models and Connection
 SQLite database schema for feature storage using SQLAlchemy.
 """
 
+import sys
 from pathlib import Path
 from typing import Optional
 
@@ -112,6 +113,57 @@ def _migrate_add_dependencies_column(engine) -> None:
             conn.commit()
 
 
+def _is_network_path(path: Path) -> bool:
+    """Detect if path is on a network filesystem.
+
+    WAL mode doesn't work reliably on network filesystems (NFS, SMB, CIFS)
+    and can cause database corruption. This function detects common network
+    path patterns so we can fall back to DELETE mode.
+
+    Args:
+        path: The path to check
+
+    Returns:
+        True if the path appears to be on a network filesystem
+    """
+    path_str = str(path.resolve())
+
+    if sys.platform == "win32":
+        # Windows UNC paths: \\server\share or \\?\UNC\server\share
+        if path_str.startswith("\\\\"):
+            return True
+        # Mapped network drives - check if the drive is a network drive
+        try:
+            import ctypes
+            drive = path_str[:2]  # e.g., "Z:"
+            if len(drive) == 2 and drive[1] == ":":
+                # DRIVE_REMOTE = 4
+                drive_type = ctypes.windll.kernel32.GetDriveTypeW(drive + "\\")
+                if drive_type == 4:  # DRIVE_REMOTE
+                    return True
+        except (AttributeError, OSError):
+            pass
+    else:
+        # Unix: Check mount type via /proc/mounts or mount command
+        try:
+            with open("/proc/mounts", "r") as f:
+                mounts = f.read()
+                # Check each mount point to find which one contains our path
+                for line in mounts.splitlines():
+                    parts = line.split()
+                    if len(parts) >= 3:
+                        mount_point = parts[1]
+                        fs_type = parts[2]
+                        # Check if path is under this mount point and if it's a network FS
+                        if path_str.startswith(mount_point):
+                            if fs_type in ("nfs", "nfs4", "cifs", "smbfs", "fuse.sshfs"):
+                                return True
+        except (FileNotFoundError, PermissionError):
+            pass
+
+    return False
+
+
 def create_database(project_dir: Path) -> tuple:
     """
     Create database and return engine + session maker.
@@ -129,9 +181,13 @@ def create_database(project_dir: Path) -> tuple:
     })
     Base.metadata.create_all(bind=engine)
 
-    # Enable WAL mode for better concurrent read/write performance
+    # Choose journal mode based on filesystem type
+    # WAL mode doesn't work reliably on network filesystems and can cause corruption
+    is_network = _is_network_path(project_dir)
+    journal_mode = "DELETE" if is_network else "WAL"
+
     with engine.connect() as conn:
-        conn.execute(text("PRAGMA journal_mode=WAL"))
+        conn.execute(text(f"PRAGMA journal_mode={journal_mode}"))
         conn.execute(text("PRAGMA busy_timeout=30000"))
         conn.commit()
 
