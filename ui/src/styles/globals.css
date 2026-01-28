@@ -591,6 +591,123 @@
 }
 
 /* ============================================================================
+   Theme: Business
+   Professional navy and gray palette for corporate use
+   Designed for trust, readability, and minimal visual noise
+   ============================================================================ */
+
+.theme-business {
+  --radius: 0.5rem;
+  --background: oklch(0.9850 0.0030 250);
+  --foreground: oklch(0.1500 0.0200 250);
+  --card: oklch(1.0000 0 0);
+  --card-foreground: oklch(0.1500 0.0200 250);
+  --popover: oklch(1.0000 0 0);
+  --popover-foreground: oklch(0.1500 0.0200 250);
+  --primary: oklch(0.3500 0.0800 250);
+  --primary-foreground: oklch(1.0000 0 0);
+  --secondary: oklch(0.9600 0.0050 250);
+  --secondary-foreground: oklch(0.1500 0.0200 250);
+  --muted: oklch(0.9400 0.0050 250);
+  --muted-foreground: oklch(0.5000 0.0150 250);
+  --accent: oklch(0.6000 0.1200 175);
+  --accent-foreground: oklch(1.0000 0 0);
+  --destructive: oklch(0.5800 0.2000 25);
+  --destructive-foreground: oklch(1.0000 0 0);
+  --border: oklch(0.9000 0.0050 250);
+  --input: oklch(0.9400 0.0050 250);
+  --ring: oklch(0.3500 0.0800 250);
+  --chart-1: oklch(0.3500 0.0800 250);
+  --chart-2: oklch(0.6000 0.1200 175);
+  --chart-3: oklch(0.5500 0.1000 280);
+  --chart-4: oklch(0.6500 0.1000 140);
+  --chart-5: oklch(0.5800 0.0800 50);
+  --sidebar: oklch(0.9700 0.0040 250);
+  --sidebar-foreground: oklch(0.1500 0.0200 250);
+  --sidebar-primary: oklch(0.3500 0.0800 250);
+  --sidebar-primary-foreground: oklch(1.0000 0 0);
+  --sidebar-accent: oklch(0.6000 0.1200 175);
+  --sidebar-accent-foreground: oklch(1.0000 0 0);
+  --sidebar-border: oklch(0.9000 0.0050 250);
+  --sidebar-ring: oklch(0.3500 0.0800 250);
+
+  /* Shadow variables - soft, professional shadows */
+  --shadow-sm: 0 1px 2px 0 rgb(15 23 42 / 0.04);
+  --shadow: 0 1px 3px 0 rgb(15 23 42 / 0.06), 0 1px 2px -1px rgb(15 23 42 / 0.04);
+  --shadow-md: 0 4px 6px -1px rgb(15 23 42 / 0.06), 0 2px 4px -2px rgb(15 23 42 / 0.04);
+  --shadow-lg: 0 10px 15px -3px rgb(15 23 42 / 0.06), 0 4px 6px -4px rgb(15 23 42 / 0.04);
+
+  /* Log level colors - muted professional tones */
+  --color-log-error: #dc2626;
+  --color-log-warning: #d97706;
+  --color-log-info: #2563eb;
+  --color-log-debug: #64748b;
+  --color-log-success: #059669;
+
+  /* Status colors for Kanban - subtle blue-gray */
+  --color-status-pending: oklch(0.9400 0.0100 250);
+  --color-status-progress: oklch(0.9000 0.0300 200);
+  --color-status-done: oklch(0.9000 0.0400 175);
+
+  /* Font stacks - system fonts for professional feel */
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-mono: 'SF Mono', SFMono-Regular, ui-monospace, Consolas, 'Liberation Mono', monospace;
+}
+
+.theme-business.dark {
+  --background: oklch(0.1300 0.0150 250);
+  --foreground: oklch(0.9500 0.0050 250);
+  --card: oklch(0.1800 0.0180 250);
+  --card-foreground: oklch(0.9500 0.0050 250);
+  --popover: oklch(0.1600 0.0160 250);
+  --popover-foreground: oklch(0.9500 0.0050 250);
+  --primary: oklch(0.6000 0.1400 250);
+  --primary-foreground: oklch(0.1000 0.0100 250);
+  --secondary: oklch(0.2200 0.0150 250);
+  --secondary-foreground: oklch(0.9500 0.0050 250);
+  --muted: oklch(0.2500 0.0120 250);
+  --muted-foreground: oklch(0.6500 0.0100 250);
+  --accent: oklch(0.6500 0.1400 175);
+  --accent-foreground: oklch(0.1000 0.0100 175);
+  --destructive: oklch(0.6500 0.2000 25);
+  --destructive-foreground: oklch(1.0000 0 0);
+  --border: oklch(0.3000 0.0150 250);
+  --input: oklch(0.2200 0.0150 250);
+  --ring: oklch(0.6000 0.1400 250);
+  --chart-1: oklch(0.6000 0.1400 250);
+  --chart-2: oklch(0.6500 0.1400 175);
+  --chart-3: oklch(0.6000 0.1200 280);
+  --chart-4: oklch(0.7000 0.1200 140);
+  --chart-5: oklch(0.6500 0.1000 50);
+  --sidebar: oklch(0.1100 0.0130 250);
+  --sidebar-foreground: oklch(0.9500 0.0050 250);
+  --sidebar-primary: oklch(0.6000 0.1400 250);
+  --sidebar-primary-foreground: oklch(0.1000 0.0100 250);
+  --sidebar-accent: oklch(0.6500 0.1400 175);
+  --sidebar-accent-foreground: oklch(0.1000 0.0100 175);
+  --sidebar-border: oklch(0.2800 0.0120 250);
+  --sidebar-ring: oklch(0.6000 0.1400 250);
+
+  /* Shadow variables - dark mode */
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.3);
+  --shadow: 0 1px 3px 0 rgb(0 0 0 / 0.4), 0 1px 2px -1px rgb(0 0 0 / 0.3);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.4), 0 2px 4px -2px rgb(0 0 0 / 0.3);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.4), 0 4px 6px -4px rgb(0 0 0 / 0.3);
+
+  /* Log level colors - dark mode */
+  --color-log-error: #f87171;
+  --color-log-warning: #fbbf24;
+  --color-log-info: #60a5fa;
+  --color-log-debug: #94a3b8;
+  --color-log-success: #34d399;
+
+  /* Status colors for Kanban - dark mode */
+  --color-status-pending: oklch(0.2500 0.0150 250);
+  --color-status-progress: oklch(0.3000 0.0400 200);
+  --color-status-done: oklch(0.3500 0.0600 175);
+}
+
+/* ============================================================================
    ShadCN Tailwind v4 Theme Integration
    ============================================================================ */
 
